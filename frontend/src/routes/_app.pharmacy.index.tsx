@@ -42,7 +42,7 @@ function PharmacyOverviewPage() {
   ).length;
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto" key={refreshKey}>
+    <div className="space-y-6 max-w-7xl mx-auto" key={refreshKey}>
       {/* Top Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
         <div>

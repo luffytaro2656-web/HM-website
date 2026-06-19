@@ -9,7 +9,7 @@ export const Route = createFileRoute("/_app/hospitals/beds")({
 
 function HospitalBedsPage() {
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       <div>
         <Link to="/hospitals" className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="size-3" /> Back to Branch Overview

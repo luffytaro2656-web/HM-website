@@ -14,7 +14,7 @@ function DoctorAvailabilityPage() {
         title="Availability Calendar"
         description="View and schedule weekly consulting availability and hospital duty shifts for clinical doctors."
       />
-      <div className="px-6 pb-6">
+      <div className="pb-6">
         <AvailabilityCalendar />
       </div>
     </div>

@@ -92,7 +92,7 @@ function HospitalDetail() {
   ];
 
   return (
-    <div key={refreshKey} className="space-y-6 max-w-7xl mx-auto p-4 sm:p-6">
+    <div key={refreshKey} className="space-y-6 max-w-7xl mx-auto">
       <div>
         <Link to="/hospitals" className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="size-3" /> Back to Branch Overview

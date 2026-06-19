@@ -59,26 +59,26 @@ function PatientDetailPage() {
         }
       />
 
-      <div className="px-6 pb-6 space-y-6">
+      <div className="pb-6 space-y-6">
         {/* Basic Info Demographic Card */}
         <PatientDetailsCard patient={patient} />
 
         {/* Tabbed Detailed View */}
         <Tabs defaultValue="vitals" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 max-w-2xl border bg-muted/30">
-            <TabsTrigger value="vitals" className="flex items-center gap-1.5 text-xs sm:text-sm">
+          <TabsList className="flex w-full overflow-x-auto justify-start md:grid md:grid-cols-4 max-w-2xl border bg-muted/30 no-scrollbar h-auto md:h-9 p-1 gap-1 md:gap-0">
+            <TabsTrigger value="vitals" className="flex shrink-0 items-center gap-1.5 text-xs sm:text-sm py-1.5 md:py-1">
               <HeartPulse className="size-3.5" />
               <span>Vitals & Nursing</span>
             </TabsTrigger>
-            <TabsTrigger value="consultations" className="flex items-center gap-1.5 text-xs sm:text-sm">
+            <TabsTrigger value="consultations" className="flex shrink-0 items-center gap-1.5 text-xs sm:text-sm py-1.5 md:py-1">
               <Stethoscope className="size-3.5" />
               <span>Consultation Logs</span>
             </TabsTrigger>
-            <TabsTrigger value="prescriptions" className="flex items-center gap-1.5 text-xs sm:text-sm">
+            <TabsTrigger value="prescriptions" className="flex shrink-0 items-center gap-1.5 text-xs sm:text-sm py-1.5 md:py-1">
               <Pill className="size-3.5" />
               <span>Prescriptions</span>
             </TabsTrigger>
-            <TabsTrigger value="billing" className="flex items-center gap-1.5 text-xs sm:text-sm">
+            <TabsTrigger value="billing" className="flex shrink-0 items-center gap-1.5 text-xs sm:text-sm py-1.5 md:py-1">
               <Receipt className="size-3.5" />
               <span>Billing History</span>
             </TabsTrigger>

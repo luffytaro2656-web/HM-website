@@ -3,7 +3,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard, Hospital, Users, Stethoscope, CalendarDays,
   UserCog, ClipboardCheck, Package, Receipt, BarChart3, Settings,
-  LogOut, ChevronLeft, Activity, Pill, FlaskConical, BedDouble, ChevronDown
+  LogOut, ChevronLeft, Activity, Pill, FlaskConical, BedDouble, ChevronDown, X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
@@ -90,9 +90,15 @@ const NAV = [
   ]},
 ] as const;
 
-export function Sidebar() {
-  const collapsed = useUIStore((s) => s.sidebarCollapsed);
+interface SidebarProps {
+  forceExpanded?: boolean;
+}
+
+export function Sidebar({ forceExpanded = false }: SidebarProps) {
+  const storeCollapsed = useUIStore((s) => s.sidebarCollapsed);
+  const collapsed = forceExpanded ? false : storeCollapsed;
   const toggle = useUIStore((s) => s.toggleSidebar);
+  const setMobileSidebar = useUIStore((s) => s.setMobileSidebar);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const activeHospitalId = useAuthStore((s) => s.activeHospitalId);
@@ -140,13 +146,23 @@ export function Sidebar() {
             </div>
           ) : null}
         </div>
-        <button
-          onClick={toggle}
-          className="rounded-md p-1 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-white"
-          aria-label="Toggle sidebar"
-        >
-          <ChevronLeft className={cn("size-4 transition-transform", collapsed && "rotate-180")} />
-        </button>
+        {!forceExpanded ? (
+          <button
+            onClick={toggle}
+            className="rounded-md p-1 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-white"
+            aria-label="Toggle sidebar"
+          >
+            <ChevronLeft className={cn("size-4 transition-transform", collapsed && "rotate-180")} />
+          </button>
+        ) : (
+          <button
+            onClick={() => setMobileSidebar(false)}
+            className="rounded-md p-1 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-white"
+            aria-label="Close sidebar"
+          >
+            <X className="size-4" />
+          </button>
+        )}
       </div>
 
       {!collapsed && user?.role === "super_admin" ? (

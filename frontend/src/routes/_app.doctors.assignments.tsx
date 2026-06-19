@@ -98,7 +98,7 @@ function DoctorAssignmentsPage() {
           />
         }
       />
-      <div key={refreshKey} className="px-6 pb-6">
+      <div key={refreshKey} className="pb-6">
         <DataTable
           data={PATIENTS}
           columns={cols}

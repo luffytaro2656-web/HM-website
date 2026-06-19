@@ -28,7 +28,7 @@ function PaymentsPage() {
   const insTotal = PAYMENTS.filter((p) => p.paymentMode === "Insurance").reduce((sum, p) => sum + p.amount, 0);
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
         <div>

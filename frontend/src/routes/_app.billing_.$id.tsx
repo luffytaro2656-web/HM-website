@@ -100,7 +100,7 @@ function InvoiceDetailsPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto" key={refreshKey}>
+    <div className="space-y-6 max-w-7xl mx-auto" key={refreshKey}>
       {/* Detail Page Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         

@@ -1,6 +1,7 @@
-import { Bell, Search } from "lucide-react";
+import { Bell, Search, Menu } from "lucide-react";
 import { useRouterState } from "@tanstack/react-router";
 import { useAuthStore } from "@/store/authStore";
+import { useUIStore } from "@/store/uiStore";
 import { HOSPITALS } from "@/mocks/hospitals";
 
 const TITLES: Record<string, string> = {
@@ -21,6 +22,7 @@ export function Header() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const activeHospitalId = useAuthStore((s) => s.activeHospitalId);
   const activeHospital = HOSPITALS.find((h) => h.id === activeHospitalId);
+  const toggleMobileSidebar = useUIStore((s) => s.toggleMobileSidebar);
 
   const title = TITLES[pathname] ?? (pathname.startsWith("/hospitals/") ? "Hospital Details"
     : pathname.startsWith("/patients/") ? "Patient Details"
@@ -29,12 +31,21 @@ export function Header() {
     : "HMS");
 
   return (
-    <header className="flex h-14 items-center justify-between border-b bg-card px-6">
-      <div>
-        <p className="text-xs text-muted-foreground">
-          <span>HMS</span> <span className="mx-1">/</span> <span className="text-foreground">{title}</span>
-        </p>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
+    <header className="flex h-14 items-center justify-between border-b bg-card px-4 md:px-6">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={toggleMobileSidebar}
+          className="flex h-9 w-9 items-center justify-center rounded-md border bg-background hover:bg-muted md:hidden"
+          aria-label="Open sidebar"
+        >
+          <Menu className="size-5 text-foreground" />
+        </button>
+        <div>
+          <p className="text-xs text-muted-foreground">
+            <span>HMS</span> <span className="mx-1">/</span> <span className="text-foreground">{title}</span>
+          </p>
+          <h2 className="text-base font-semibold text-foreground">{title}</h2>
+        </div>
       </div>
       <div className="flex items-center gap-3">
         <div className="relative hidden md:block">
