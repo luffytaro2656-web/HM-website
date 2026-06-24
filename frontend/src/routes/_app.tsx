@@ -5,6 +5,7 @@ import { Header } from "@/components/layout/Header";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/uiStore";
 import { cn } from "@/lib/utils";
+import { getPermissionsRequest } from "@/lib/api/permissions";
 
 export const Route = createFileRoute("/_app")({
   component: AppLayout,
@@ -12,6 +13,8 @@ export const Route = createFileRoute("/_app")({
 
 function AppLayout() {
   const user = useAuthStore((s) => s.user);
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const setPermissions = useAuthStore((s) => s.setPermissions);
   const mobileSidebarOpen = useUIStore((s) => s.mobileSidebarOpen);
   const setMobileSidebar = useUIStore((s) => s.setMobileSidebar);
   const pathname = useRouterState({ select: (r) => r.location.pathname });
@@ -19,6 +22,18 @@ function AppLayout() {
   useEffect(() => {
     setMobileSidebar(false);
   }, [pathname, setMobileSidebar]);
+
+  useEffect(() => {
+    if (user && accessToken) {
+      getPermissionsRequest()
+        .then((perms) => {
+          setPermissions(perms);
+        })
+        .catch((err) => {
+          console.error("Failed to sync permissions with backend:", err);
+        });
+    }
+  }, [user, accessToken, setPermissions]);
 
   if (!user) {
     // Client-side redirect after hydration; avoid throwing during SSR for persisted store

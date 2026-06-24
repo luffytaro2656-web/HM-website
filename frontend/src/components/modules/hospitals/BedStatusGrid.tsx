@@ -1,21 +1,29 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { HOSPITALS, HOSPITAL_BEDS, addHospitalBed, updateHospitalBedStatus } from "@/mocks/hospitals";
 import { toast } from "sonner";
 import { BedDouble, PlusCircle, CheckCircle2, AlertTriangle, Hammer, Search, ShieldCheck } from "lucide-react";
+import {
+  getHospitalsData,
+  getHospitalDepartments,
+  getHospitalBeds,
+  createHospitalBed,
+  updateHospitalBed,
+  deleteHospitalBed,
+} from "@/lib/api/hospitals";
 
 interface BedStatusGridProps {
   hospitalId?: string; // Optional: filters to a single hospital
 }
 
 export function BedStatusGrid({ hospitalId }: BedStatusGridProps) {
-  // If hospitalId is not passed, let user select one (Super Admin mode)
-  const [selectedHospId, setSelectedHospId] = useState(hospitalId || HOSPITALS[0].id);
+  const queryClient = useQueryClient();
+  const [selectedHospId, setSelectedHospId] = useState(hospitalId || "");
   const [wardFilter, setWardFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -25,26 +33,92 @@ export function BedStatusGrid({ hospitalId }: BedStatusGridProps) {
   const [newCategory, setNewCategory] = useState<"General" | "ICU" | "Private">("General");
   const [newStatus, setNewStatus] = useState<"Available" | "Occupied" | "Maintenance">("Available");
   const [newNotes, setNewNotes] = useState("");
+  const [newDeptId, setNewDeptId] = useState("");
 
   // Edit Bed status states
   const [selectedBedId, setSelectedBedId] = useState<string | null>(null);
   const [editStatus, setEditStatus] = useState<"Available" | "Occupied" | "Maintenance">("Available");
   const [editNotes, setEditNotes] = useState("");
+  const [editDeptId, setEditDeptId] = useState("");
+
+  const handleWardChange = (wardName: string) => {
+    setNewWardName(wardName);
+    if (wardName.includes("ICU")) {
+      setNewCategory("ICU");
+    } else if (wardName.includes("Private")) {
+      setNewCategory("Private");
+    } else {
+      setNewCategory("General");
+    }
+  };
+
+  // Query Hospitals list
+  const { data: hospitals = [] } = useQuery({
+    queryKey: ["hospitals"],
+    queryFn: getHospitalsData,
+    enabled: !hospitalId,
+  });
+
+  // Automatically select first hospital when loaded
+  useEffect(() => {
+    if (!hospitalId && hospitals.length > 0 && !selectedHospId) {
+      setSelectedHospId(hospitals[0].id);
+    }
+  }, [hospitals, hospitalId, selectedHospId]);
 
   const activeHospId = hospitalId || selectedHospId;
 
+  // Query Departments of the active hospital
+  const { data: departments = [] } = useQuery({
+    queryKey: ["hospitals", activeHospId, "departments"],
+    queryFn: () => getHospitalDepartments(activeHospId),
+    enabled: !!activeHospId,
+  });
+
+  // Query Beds of the active hospital
+  const { data: beds = [], isLoading: isLoadingBeds } = useQuery({
+    queryKey: ["hospitals", activeHospId, "beds"],
+    queryFn: () => getHospitalBeds(activeHospId),
+    enabled: !!activeHospId,
+  });
+
+  // Set default department when departments load
+  useEffect(() => {
+    if (departments.length > 0) {
+      setNewDeptId(departments[0].id);
+    }
+  }, [departments]);
+
   // Filter beds
-  const hospitalBeds = HOSPITAL_BEDS.filter((bed) => {
-    if (bed.hospitalId !== activeHospId) return false;
+  const hospitalBeds = beds.filter((bed) => {
     if (wardFilter !== "all" && bed.wardName !== wardFilter) return false;
     if (statusFilter !== "all" && bed.status !== statusFilter) return false;
     return true;
   });
 
   // Unique wards list for filtering
-  const uniqueWards = Array.from(
-    new Set(HOSPITAL_BEDS.filter((b) => b.hospitalId === activeHospId).map((b) => b.wardName))
-  );
+  const uniqueWards = Array.from(new Set(beds.map((b) => b.wardName)));
+
+  const createBedMutation = useMutation({
+    mutationFn: (data: {
+      departmentId: string;
+      wardName: string;
+      category: "General" | "ICU" | "Private";
+      status: "Available" | "Occupied" | "Maintenance";
+      notes?: string;
+    }) => createHospitalBed(activeHospId, data),
+    onSuccess: (newBed) => {
+      toast.success("Bed Registered!", {
+        description: `Successfully added bed ${newBed.id} to ${newBed.wardName}.`,
+      });
+      setShowAddBed(false);
+      setNewNotes("");
+      queryClient.invalidateQueries({ queryKey: ["hospitals", activeHospId, "beds"] });
+    },
+    onError: (err: any) => {
+      toast.error("Failed to register bed", { description: err.message });
+    },
+  });
 
   const handleAddBedSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,34 +126,66 @@ export function BedStatusGrid({ hospitalId }: BedStatusGridProps) {
       toast.error("Please enter a ward name");
       return;
     }
-
-    const bed = addHospitalBed(activeHospId, newWardName, newCategory, newStatus, newNotes);
-    if (bed) {
-      toast.success("Bed Registered!", {
-        description: `Successfully added bed ${bed.id} to ${newWardName}.`,
-      });
-      setShowAddBed(false);
-      setNewNotes("");
+    if (!newDeptId) {
+      toast.error("Please select a department");
+      return;
     }
+    createBedMutation.mutate({
+      departmentId: newDeptId,
+      wardName: newWardName,
+      category: newCategory,
+      status: newStatus,
+      notes: newNotes,
+    });
   };
 
-  const handleUpdateBedStatusSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedBedId) return;
-
-    const bed = updateHospitalBedStatus(activeHospId, selectedBedId, editStatus, editNotes);
-    if (bed) {
+  const updateBedMutation = useMutation({
+    mutationFn: (data: {
+      status: "Available" | "Occupied" | "Maintenance";
+      notes?: string;
+      departmentId?: string;
+    }) => updateHospitalBed(activeHospId, selectedBedId!, data),
+    onSuccess: () => {
       toast.success("Bed Status Updated!", {
         description: `Bed ${selectedBedId} marked as ${editStatus}.`,
       });
       setSelectedBedId(null);
-    }
+      queryClient.invalidateQueries({ queryKey: ["hospitals", activeHospId, "beds"] });
+    },
+    onError: (err: any) => {
+      toast.error("Failed to update bed status", { description: err.message });
+    },
+  });
+
+  const handleUpdateBedStatusSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBedId) return;
+    updateBedMutation.mutate({
+      status: editStatus,
+      notes: editNotes,
+      departmentId: editDeptId || undefined,
+    });
   };
 
-  const startEditBed = (bed: typeof HOSPITAL_BEDS[0]) => {
+  const deleteBedMutation = useMutation({
+    mutationFn: () => deleteHospitalBed(activeHospId, selectedBedId!),
+    onSuccess: () => {
+      toast.success("Bed Deleted!", {
+        description: `Successfully deleted bed ${selectedBedId}.`,
+      });
+      setSelectedBedId(null);
+      queryClient.invalidateQueries({ queryKey: ["hospitals", activeHospId, "beds"] });
+    },
+    onError: (err: any) => {
+      toast.error("Failed to delete bed", { description: err.message });
+    },
+  });
+
+  const startEditBed = (bed: any) => {
     setSelectedBedId(bed.id);
     setEditStatus(bed.status);
     setEditNotes(bed.notes || "");
+    setEditDeptId(bed.departmentId || "");
   };
 
   return (
@@ -96,7 +202,7 @@ export function BedStatusGrid({ hospitalId }: BedStatusGridProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
-                    {HOSPITALS.map((h) => (
+                    {hospitals.map((h) => (
                       <SelectItem key={h.id} value={h.id}>
                         {h.name}
                       </SelectItem>
@@ -154,22 +260,40 @@ export function BedStatusGrid({ hospitalId }: BedStatusGridProps) {
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-sm font-bold">Register Physical Bed</CardTitle>
             <CardDescription className="text-xs">
-              Install a new physical bed unit into a selected ward category.
+              Install a new physical bed unit into a selected ward category and clinical department.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4">
             <form onSubmit={handleAddBedSubmit} className="space-y-4 max-w-2xl">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold">Ward Name</Label>
-                  <Select value={newWardName} onValueChange={setNewWardName}>
+                  <Select value={newWardName} onValueChange={handleWardChange}>
                     <SelectTrigger className="h-9 text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="General Ward A">General Ward A</SelectItem>
-                      <SelectItem value="ICU Wing">ICU Wing</SelectItem>
-                      <SelectItem value="Private Suite B">Private Suite B</SelectItem>
+                      <SelectItem value="General Ward A">General Ward A (General Care)</SelectItem>
+                      <SelectItem value="Pediatric Ward">Pediatric Ward (General Care)</SelectItem>
+                      <SelectItem value="Maternity Ward">Maternity Ward (General Care)</SelectItem>
+                      <SelectItem value="ICU Wing">ICU Wing (Critical Care)</SelectItem>
+                      <SelectItem value="Private Suite B">Private Suite B (Premium Suite)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Clinical Department</Label>
+                  <Select value={newDeptId} onValueChange={setNewDeptId}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Select Dept" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -227,9 +351,15 @@ export function BedStatusGrid({ hospitalId }: BedStatusGridProps) {
       )}
 
       {/* Beds Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4 animate-fadeIn">
-        {hospitalBeds.length > 0 ? (
-          hospitalBeds.map((bed) => {
+      {isLoadingBeds ? (
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+            <div key={n} className="border border-border bg-card rounded-xl p-4 h-[110px] animate-pulse"></div>
+          ))}
+        </div>
+      ) : hospitalBeds.length > 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4 animate-fadeIn">
+          {hospitalBeds.map((bed) => {
             let colorClass = "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/25";
             let Icon = CheckCircle2;
             if (bed.status === "Occupied") {
@@ -240,11 +370,14 @@ export function BedStatusGrid({ hospitalId }: BedStatusGridProps) {
               Icon = Hammer;
             }
 
+            const dept = departments.find((d) => d.id === bed.departmentId);
+            const deptLabel = dept ? dept.name : "";
+
             return (
               <button
                 key={bed.id}
                 onClick={() => startEditBed(bed)}
-                className={`border rounded-xl p-3.5 flex flex-col items-center text-center justify-between transition-all hover:scale-[1.03] ${colorClass}`}
+                className={`border rounded-xl p-3 flex flex-col items-center text-center justify-between transition-all hover:scale-[1.03] ${colorClass}`}
               >
                 <div className="flex items-center justify-between w-full">
                   <Badge variant="outline" className="text-[8px] px-1 py-0 h-4 border-transparent bg-background/50">
@@ -252,22 +385,22 @@ export function BedStatusGrid({ hospitalId }: BedStatusGridProps) {
                   </Badge>
                   <Icon className="size-3.5" />
                 </div>
-                <div className="my-2.5">
+                <div className="my-2">
                   <span className="font-mono font-bold text-sm block">{bed.id}</span>
                   <span className="text-[9px] font-semibold text-muted-foreground uppercase">{bed.status}</span>
                 </div>
-                <div className="text-[9px] text-muted-foreground truncate w-full">
-                  {bed.wardName}
+                <div className="text-[8px] text-muted-foreground truncate w-full">
+                  {bed.wardName} {deptLabel && `(${deptLabel})`}
                 </div>
               </button>
             );
-          })
-        ) : (
-          <div className="col-span-full border border-dashed border-border p-12 text-center text-muted-foreground text-xs italic">
-            No physical beds matched the search criteria.
-          </div>
-        )}
-      </div>
+          })}
+        </div>
+      ) : (
+        <div className="border border-dashed border-border p-12 text-center text-muted-foreground text-xs italic">
+          No physical beds matched the search criteria.
+        </div>
+      )}
 
       {/* Edit Bed status Modal dialog */}
       {selectedBedId && (
@@ -296,6 +429,22 @@ export function BedStatusGrid({ hospitalId }: BedStatusGridProps) {
                 </div>
 
                 <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Assign Clinical Department</Label>
+                  <Select value={editDeptId} onValueChange={setEditDeptId}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Select Department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
                   <Label className="text-xs font-semibold">Maintenance or Medical Notes</Label>
                   <Input
                     className="text-xs h-8"
@@ -304,13 +453,28 @@ export function BedStatusGrid({ hospitalId }: BedStatusGridProps) {
                   />
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2 border-t border-border">
-                  <Button variant="outline" size="sm" type="button" onClick={() => setSelectedBedId(null)} className="h-8 text-xs">
-                    Cancel
+                <div className="flex justify-between gap-2 pt-2 border-t border-border">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm("Are you sure you want to delete this bed?")) {
+                        deleteBedMutation.mutate();
+                      }
+                    }}
+                    className="h-8 text-xs"
+                  >
+                    Delete Bed
                   </Button>
-                  <Button size="sm" type="submit" className="h-8 text-xs">
-                    Save Changes
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" type="button" onClick={() => setSelectedBedId(null)} className="h-8 text-xs">
+                      Cancel
+                    </Button>
+                    <Button size="sm" type="submit" className="h-8 text-xs">
+                      Save Changes
+                    </Button>
+                  </div>
                 </div>
               </form>
             </CardContent>

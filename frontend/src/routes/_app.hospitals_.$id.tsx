@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, MapPin, Phone, BedDouble, Stethoscope, Users, IndianRupee, Edit3, Settings, Clock, HelpCircle } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { StatCard } from "@/components/common/StatCard";
@@ -12,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getHospital, updateHospitalProfile } from "@/mocks/hospitals";
+import { getHospitalDetails, updateHospitalRequest } from "@/lib/api/hospitals";
 import { DOCTORS } from "@/mocks/doctors";
 import { STAFF } from "@/mocks/staff";
 import { formatCurrency } from "@/utils/formatters";
@@ -22,10 +24,16 @@ import { BedStatusGrid } from "@/components/modules/hospitals/BedStatusGrid";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/hospitals_/$id")({
-  loader: ({ params }) => {
-    const hospital = getHospital(params.id);
-    if (!hospital) throw notFound();
-    return { hospital };
+  loader: async ({ params }) => {
+    try {
+      const hospital = await getHospitalDetails(params.id);
+      return { hospital };
+    } catch (err) {
+      console.warn("Backend hospital details fetch failed, falling back to mock:", err);
+      const hospital = getHospital(params.id);
+      if (!hospital) throw notFound();
+      return { hospital };
+    }
   },
   head: ({ loaderData }) => ({
     meta: [{ title: loaderData ? `${loaderData.hospital.name} — HMS` : "Hospital — HMS" }],
@@ -43,9 +51,17 @@ export const Route = createFileRoute("/_app/hospitals_/$id")({
 const TABS = ["Overview", "Departments", "Doctors", "Beds", "Staff", "Reports"] as const;
 
 function HospitalDetail() {
-  const { hospital } = Route.useLoaderData();
+  const loaderData = Route.useLoaderData();
+  const { id } = Route.useParams();
+  const queryClient = useQueryClient();
+
+  const { data: hospital } = useQuery({
+    queryKey: ["hospitals", id],
+    queryFn: () => getHospitalDetails(id),
+    initialData: loaderData.hospital,
+  });
+
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
-  const [refreshKey, setRefreshKey] = useState(0);
 
   // Edit Profile Dialog states
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -53,34 +69,71 @@ function HospitalDetail() {
   const [hospCity, setHospCity] = useState(hospital.city);
   const [hospAddress, setHospAddress] = useState(hospital.address);
   const [hospContact, setHospContact] = useState(hospital.contact);
-  const [hospHours, setHospHours] = useState((hospital as any).operatingHours || "24/7 Fully Operational");
+  const [hospHours, setHospHours] = useState(hospital.operatingHours || "24/7 Fully Operational");
   const [hospStatus, setHospStatus] = useState(hospital.status);
+
+  // Sync state values when modal opens or query updates
+  useEffect(() => {
+    if (showEditDialog && hospital) {
+      setHospName(hospital.name);
+      setHospCity(hospital.city);
+      setHospAddress(hospital.address);
+      setHospContact(hospital.contact);
+      setHospHours(hospital.operatingHours || "24/7 Fully Operational");
+      setHospStatus(hospital.status);
+    }
+  }, [showEditDialog, hospital]);
 
   const doctors = DOCTORS.filter((d) => d.hospitalId === hospital.id);
   const staff = STAFF.filter((s) => s.hospitalId === hospital.id);
 
-  const handleUpdateProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    const updated = updateHospitalProfile(
-      hospital.id,
-      hospName,
-      hospCity,
-      hospAddress,
-      hospContact,
-      (hospital as any).facilities || [],
-      hospHours,
-      hospStatus
-    );
+  const updateHospitalMutation = useMutation({
+    mutationFn: (variables: {
+      name: string;
+      city: string;
+      address: string;
+      contact: string;
+      operatingHours: string;
+      status: "Active" | "Inactive";
+    }) => updateHospitalRequest(hospital.id, variables),
+    onSuccess: (updatedData, variables) => {
+      // Maintain local mock parity just in case
+      updateHospitalProfile(
+        hospital.id,
+        variables.name,
+        variables.city,
+        variables.address,
+        variables.contact,
+        (hospital as any).facilities || [],
+        variables.operatingHours,
+        variables.status
+      );
 
-    if (updated) {
       toast.success("Profile Updated!", {
-        description: `Successfully saved details for ${hospName}.`,
+        description: `Successfully saved details for ${variables.name}.`,
       });
       setShowEditDialog(false);
-      setRefreshKey(k => k + 1);
-    } else {
-      toast.error("Failed to update profile details.");
+      queryClient.invalidateQueries({ queryKey: ["hospitals", id] });
+      queryClient.invalidateQueries({ queryKey: ["hospitals"] });
+    },
+    onError: (error: any) => {
+      console.error("Failed to update hospital details:", error);
+      toast.error("Failed to update profile details.", {
+        description: error.message || "Something went wrong.",
+      });
     }
+  });
+
+  const handleUpdateProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateHospitalMutation.mutate({
+      name: hospName,
+      city: hospCity,
+      address: hospAddress,
+      contact: hospContact,
+      operatingHours: hospHours,
+      status: hospStatus,
+    });
   };
 
   const doctorCols: Column<Doctor>[] = [
@@ -92,7 +145,7 @@ function HospitalDetail() {
   ];
 
   return (
-    <div key={refreshKey} className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       <div>
         <Link to="/hospitals" className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="size-3" /> Back to Branch Overview

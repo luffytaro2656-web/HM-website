@@ -1,15 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useAuthStore } from "@/store/authStore";
+import { RolePrivilegesTab } from "@/components/modules/roles/RolePrivilegesTab";
 
 export const Route = createFileRoute("/_app/settings/roles")({
   head: () => ({ meta: [{ title: "Role & Permission Configuration — HMS" }] }),
+  beforeLoad: () => {
+    const user = useAuthStore.getState().user;
+    const isSuperAdmin = user?.role === "super_admin" || user?.backendRole === "Super Admin";
+    if (!isSuperAdmin) {
+      throw redirect({ to: "/dashboard" });
+    }
+  },
   component: SettingsRolesPage,
 });
 
 function SettingsRolesPage() {
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold tracking-tight">Role & Permission Configuration</h1>
-      <p className="mt-1 text-sm text-muted-foreground">This is a placeholder page for the Role & Permission Configuration module.</p>
+    <div className="space-y-4 p-6">
+      <RolePrivilegesTab />
     </div>
   );
 }

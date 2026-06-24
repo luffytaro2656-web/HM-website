@@ -1,13 +1,19 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { HOSPITALS, DEPARTMENTS, addDepartment, updateDepartment } from "@/mocks/hospitals";
+import { HOSPITALS, DEPARTMENTS } from "@/mocks/hospitals";
 import { toast } from "sonner";
 import { Stethoscope, Users, PlusCircle, Search, Edit3, ShieldAlert, CheckCircle } from "lucide-react";
+import {
+  getHospitalsData,
+  getHospitalDepartments,
+  createDepartmentRequest,
+  updateDepartmentRequest,
+} from "@/lib/api/hospitals";
 
 interface DepartmentListProps {
   hospitalId?: string; // Optional: if provided, filters to that hospital only
@@ -15,8 +21,12 @@ interface DepartmentListProps {
 
 export function DepartmentList({ hospitalId }: DepartmentListProps) {
   // If hospitalId is not passed, let user select one (Super Admin mode)
-  const [selectedHospId, setSelectedHospId] = useState(hospitalId || HOSPITALS[0].id);
+  const [hospitals, setHospitals] = useState<any[]>(HOSPITALS);
+  const [selectedHospId, setSelectedHospId] = useState(hospitalId || "");
   const [searchQuery, setSearchQuery] = useState("");
+  const [departmentsList, setDepartmentsList] = useState<any[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [loadingDepts, setLoadingDepts] = useState(true);
   
   // Add state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -35,46 +45,103 @@ export function DepartmentList({ hospitalId }: DepartmentListProps) {
 
   const activeHospId = hospitalId || selectedHospId;
 
+  // Fetch hospitals on mount
+  useEffect(() => {
+    getHospitalsData()
+      .then((data) => {
+        if (data && data.length > 0) {
+          setHospitals(data);
+          if (!hospitalId) {
+            setSelectedHospId(data[0].id);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load hospitals for department list:", err);
+      });
+  }, []);
+
+  // Fetch departments for the active hospital
+  useEffect(() => {
+    if (!activeHospId) return;
+    setLoadingDepts(true);
+    getHospitalDepartments(activeHospId)
+      .then((data) => {
+        setDepartmentsList(data);
+      })
+      .catch((err) => {
+        console.error("Failed to load departments from backend, falling back to mock:", err);
+        const mocks = DEPARTMENTS.filter((d) => d.hospitalId === activeHospId);
+        setDepartmentsList(mocks);
+      })
+      .finally(() => setLoadingDepts(false));
+  }, [activeHospId, refreshKey]);
+
   // Filter departments
-  const hospitalDepts = DEPARTMENTS.filter(
-    (d) => d.hospitalId === activeHospId && d.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const hospitalDepts = departmentsList.filter(
+    (d) => d.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleAddDept = (e: React.FormEvent) => {
+  const handleAddDept = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDeptName || !newHead) {
       toast.error("Please fill in the department name and head of department");
       return;
     }
 
-    const dept = addDepartment(activeHospId, newDeptName, newHead, newStaffCount, newBedCount);
-    if (dept) {
+    try {
+      await createDepartmentRequest(activeHospId, {
+        name: newDeptName,
+        headOfDepartment: newHead,
+        staffCount: newStaffCount,
+        bedCount: 0,
+      });
+
       toast.success("Department Created!", {
         description: `Successfully added ${newDeptName} to the department registry.`,
       });
-      // Reset
+
       setNewDeptName("");
       setNewHead("");
       setNewStaffCount(12);
-      setNewBedCount(8);
       setShowAddForm(false);
+      setRefreshKey((k) => k + 1);
+    } catch (error: any) {
+      console.error("Failed to create department:", error);
+      toast.error("Failed to create department", {
+        description: error.message || "Something went wrong.",
+      });
     }
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editDeptId) return;
 
-    const dept = updateDepartment(editDeptId, editName, editHead, editStaffCount, editBedCount, editStatus);
-    if (dept) {
+    try {
+      await updateDepartmentRequest(activeHospId, editDeptId, {
+        name: editName,
+        headOfDepartment: editHead,
+        staffCount: editStaffCount,
+        bedCount: 0,
+        status: editStatus,
+      });
+
       toast.success("Department Updated!", {
         description: `Changes for ${editName} saved successfully.`,
       });
+
       setEditDeptId(null);
+      setRefreshKey((k) => k + 1);
+    } catch (error: any) {
+      console.error("Failed to update department:", error);
+      toast.error("Failed to update department", {
+        description: error.message || "Something went wrong.",
+      });
     }
   };
 
-  const startEdit = (dept: typeof DEPARTMENTS[0]) => {
+  const startEdit = (dept: any) => {
     setEditDeptId(dept.id);
     setEditName(dept.name);
     setEditHead(dept.headOfDepartment);
@@ -96,7 +163,7 @@ export function DepartmentList({ hospitalId }: DepartmentListProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="max-h-[200px]">
-                  {HOSPITALS.map((h) => (
+                  {hospitals.map((h) => (
                     <SelectItem key={h.id} value={h.id}>
                       {h.name} ({h.city})
                     </SelectItem>
@@ -167,27 +234,15 @@ export function DepartmentList({ hospitalId }: DepartmentListProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Allocated Clinicians/Staff</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    className="text-xs h-9"
-                    value={newStaffCount}
-                    onChange={(e) => setNewStaffCount(parseInt(e.target.value) || 0)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Allocated Bed Count</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    className="text-xs h-9"
-                    value={newBedCount}
-                    onChange={(e) => setNewBedCount(parseInt(e.target.value) || 0)}
-                  />
-                </div>
+              <div className="space-y-1.5 max-w-xs">
+                <Label className="text-xs font-semibold">Allocated Clinicians/Staff</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  className="text-xs h-9"
+                  value={newStaffCount}
+                  onChange={(e) => setNewStaffCount(parseInt(e.target.value) || 0)}
+                />
               </div>
 
               <div className="flex gap-2 justify-end pt-2">
@@ -274,25 +329,14 @@ export function DepartmentList({ hospitalId }: DepartmentListProps) {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">Active Clinicians Count</Label>
-                    <Input
-                      type="number"
-                      className="text-xs h-8"
-                      value={editStaffCount}
-                      onChange={(e) => setEditStaffCount(parseInt(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">Bed Allocation</Label>
-                    <Input
-                      type="number"
-                      className="text-xs h-8"
-                      value={editBedCount}
-                      onChange={(e) => setEditBedCount(parseInt(e.target.value) || 0)}
-                    />
-                  </div>
+                <div className="space-y-1.5 max-w-xs">
+                  <Label className="text-xs font-semibold">Active Clinicians Count</Label>
+                  <Input
+                    type="number"
+                    className="text-xs h-8"
+                    value={editStaffCount}
+                    onChange={(e) => setEditStaffCount(parseInt(e.target.value) || 0)}
+                  />
                 </div>
 
                 <div className="space-y-1.5">

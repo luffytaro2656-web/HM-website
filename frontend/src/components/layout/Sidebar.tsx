@@ -6,10 +6,28 @@ import {
   LogOut, ChevronLeft, Activity, Pill, FlaskConical, BedDouble, ChevronDown, X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePermission } from "@/hooks/usePermission";
+import { type AppModule } from "@/config/roleConfig";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/uiStore";
 import { ROLE_LABELS } from "@/types/common";
 import { HOSPITALS } from "@/mocks/hospitals";
+
+const PATH_TO_MODULE_MAP: Record<string, AppModule> = {
+  "/dashboard": "dashboard",
+  "/patients": "patients",
+  "/doctors": "doctors",
+  "/appointments": "appointments",
+  "/admissions": "admissions",
+  "/pharmacy": "pharmacy",
+  "/lab": "lab",
+  "/hospitals": "hospitals",
+  "/staff": "staff",
+  "/inventory": "inventory",
+  "/billing": "billing",
+  "/reports": "reports",
+  "/settings": "settings",
+};
 
 const NAV = [
   { group: "Overview", items: [{ to: "/dashboard", label: "Dashboard", icon: LayoutDashboard }] },
@@ -83,6 +101,7 @@ const NAV = [
   { group: "System", items: [
     { to: "/settings", label: "Settings", icon: Settings, subItems: [
         { to: "/settings", label: "System Config" },
+        { to: "/settings/users", label: "User Management" },
         { to: "/settings/roles", label: "Role Privileges" },
         { to: "/settings/audit", label: "Audit Logs" }
       ]
@@ -105,11 +124,22 @@ export function Sidebar({ forceExpanded = false }: SidebarProps) {
   const setActiveHospital = useAuthStore((s) => s.setActiveHospital);
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const activeHospital = HOSPITALS.find((h) => h.id === activeHospitalId);
+  const { canAccess } = usePermission();
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
+  // Filter navigation items dynamically according to the user permissions
+  const filteredNav = NAV.map((group) => {
+    const filteredItems = group.items.filter((item) => {
+      const moduleKey = PATH_TO_MODULE_MAP[item.to];
+      if (!moduleKey) return true;
+      return canAccess(moduleKey, "read");
+    });
+    return { ...group, items: filteredItems };
+  }).filter((group) => group.items.length > 0);
+
   useEffect(() => {
-    NAV.forEach((group) => {
+    filteredNav.forEach((group) => {
       group.items.forEach((item) => {
         if ("subItems" in item && Array.isArray(item.subItems)) {
           const hasActiveSub = item.subItems.some((sub) => pathname === sub.to);
@@ -184,7 +214,7 @@ export function Sidebar({ forceExpanded = false }: SidebarProps) {
       ) : null}
 
       <nav className="flex-1 overflow-y-auto px-2 py-3">
-        {NAV.map((group) => (
+        {filteredNav.map((group) => (
           <div key={group.group} className="mb-4">
             {!collapsed ? (
               <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">
@@ -267,7 +297,7 @@ export function Sidebar({ forceExpanded = false }: SidebarProps) {
             {!collapsed ? (
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-white">{user.name}</p>
-                <p className="truncate text-[11px] text-sidebar-foreground/70">{ROLE_LABELS[user.role]}</p>
+                <p className="truncate text-[11px] text-sidebar-foreground/70">{user.backendRole || ROLE_LABELS[user.role]}</p>
               </div>
             ) : null}
             {!collapsed ? (

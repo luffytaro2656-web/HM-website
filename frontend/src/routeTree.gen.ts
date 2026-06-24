@@ -41,6 +41,7 @@ import { Route as AppStaffPayrollRouteImport } from './routes/_app.staff.payroll
 import { Route as AppStaffLeavesRouteImport } from './routes/_app.staff.leaves'
 import { Route as AppStaffCreateRouteImport } from './routes/_app.staff.create'
 import { Route as AppStaffAttendanceRouteImport } from './routes/_app.staff.attendance'
+import { Route as AppSettingsUsersRouteImport } from './routes/_app.settings.users'
 import { Route as AppSettingsRolesRouteImport } from './routes/_app.settings.roles'
 import { Route as AppSettingsAuditRouteImport } from './routes/_app.settings.audit'
 import { Route as AppPharmacyPurchasesRouteImport } from './routes/_app.pharmacy.purchases'
@@ -219,6 +220,11 @@ const AppStaffAttendanceRoute = AppStaffAttendanceRouteImport.update({
   path: '/attendance',
   getParentRoute: () => AppStaffRoute,
 } as any)
+const AppSettingsUsersRoute = AppSettingsUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppSettingsRolesRoute = AppSettingsRolesRouteImport.update({
   id: '/roles',
   path: '/roles',
@@ -345,6 +351,7 @@ export interface FileRoutesByFullPath {
   '/pharmacy/purchases': typeof AppPharmacyPurchasesRoute
   '/settings/audit': typeof AppSettingsAuditRoute
   '/settings/roles': typeof AppSettingsRolesRoute
+  '/settings/users': typeof AppSettingsUsersRoute
   '/staff/attendance': typeof AppStaffAttendanceRoute
   '/staff/create': typeof AppStaffCreateRoute
   '/staff/leaves': typeof AppStaffLeavesRoute
@@ -386,6 +393,7 @@ export interface FileRoutesByTo {
   '/pharmacy/purchases': typeof AppPharmacyPurchasesRoute
   '/settings/audit': typeof AppSettingsAuditRoute
   '/settings/roles': typeof AppSettingsRolesRoute
+  '/settings/users': typeof AppSettingsUsersRoute
   '/staff/attendance': typeof AppStaffAttendanceRoute
   '/staff/create': typeof AppStaffCreateRoute
   '/staff/leaves': typeof AppStaffLeavesRoute
@@ -439,6 +447,7 @@ export interface FileRoutesById {
   '/_app/pharmacy/purchases': typeof AppPharmacyPurchasesRoute
   '/_app/settings/audit': typeof AppSettingsAuditRoute
   '/_app/settings/roles': typeof AppSettingsRolesRoute
+  '/_app/settings/users': typeof AppSettingsUsersRoute
   '/_app/staff/attendance': typeof AppStaffAttendanceRoute
   '/_app/staff/create': typeof AppStaffCreateRoute
   '/_app/staff/leaves': typeof AppStaffLeavesRoute
@@ -492,6 +501,7 @@ export interface FileRouteTypes {
     | '/pharmacy/purchases'
     | '/settings/audit'
     | '/settings/roles'
+    | '/settings/users'
     | '/staff/attendance'
     | '/staff/create'
     | '/staff/leaves'
@@ -533,6 +543,7 @@ export interface FileRouteTypes {
     | '/pharmacy/purchases'
     | '/settings/audit'
     | '/settings/roles'
+    | '/settings/users'
     | '/staff/attendance'
     | '/staff/create'
     | '/staff/leaves'
@@ -585,6 +596,7 @@ export interface FileRouteTypes {
     | '/_app/pharmacy/purchases'
     | '/_app/settings/audit'
     | '/_app/settings/roles'
+    | '/_app/settings/users'
     | '/_app/staff/attendance'
     | '/_app/staff/create'
     | '/_app/staff/leaves'
@@ -833,6 +845,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/staff/attendance'
       preLoaderRoute: typeof AppStaffAttendanceRouteImport
       parentRoute: typeof AppStaffRoute
+    }
+    '/_app/settings/users': {
+      id: '/_app/settings/users'
+      path: '/users'
+      fullPath: '/settings/users'
+      preLoaderRoute: typeof AppSettingsUsersRouteImport
+      parentRoute: typeof AppSettingsRoute
     }
     '/_app/settings/roles': {
       id: '/_app/settings/roles'
@@ -1099,11 +1118,13 @@ const AppPharmacyRouteWithChildren = AppPharmacyRoute._addFileChildren(
 interface AppSettingsRouteChildren {
   AppSettingsAuditRoute: typeof AppSettingsAuditRoute
   AppSettingsRolesRoute: typeof AppSettingsRolesRoute
+  AppSettingsUsersRoute: typeof AppSettingsUsersRoute
 }
 
 const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsAuditRoute: AppSettingsAuditRoute,
   AppSettingsRolesRoute: AppSettingsRolesRoute,
+  AppSettingsUsersRoute: AppSettingsUsersRoute,
 }
 
 const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
