@@ -1,7 +1,7 @@
 import { useAuthStore } from "@/store/authStore";
 import type { Role } from "@/types/common";
 
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
 // Map frontend lowercase-snake roles to backend Pascal-spaced roles
 const ROLE_MAP_TO_BACKEND: Record<Role, string> = {

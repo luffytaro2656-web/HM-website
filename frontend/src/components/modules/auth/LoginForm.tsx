@@ -65,17 +65,6 @@ export function LoginForm({ onSubmit, isLoading, onToggleForm }: LoginFormProps)
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? "Signing In..." : "Access System"}
       </Button>
-
-      <div className="text-center text-sm text-muted-foreground mt-4">
-        Don't have an account?{" "}
-        <button
-          type="button"
-          onClick={onToggleForm}
-          className="text-primary font-semibold hover:underline"
-        >
-          Sign Up
-        </button>
-      </div>
     </form>
   );
 }
